@@ -14,7 +14,8 @@ use Guzzle\Http\Message\Response as Response;
  * @category  WebPT
  * @copyright Copyright (c) 2014 WebPT, Inc.
  */
-class DruidConnection {
+class DruidConnection
+{
     /**
      * http protocol
      */
@@ -54,7 +55,7 @@ class DruidConnection {
     protected $query;
     /**
      * The instance of the object (Singleton)
-     * @var Connection
+     * @var DruidConnection
      * @access protected
      */
     protected static $instance;
@@ -71,27 +72,39 @@ class DruidConnection {
      * @var Response
      */
     protected $response;
+    /**
+     * Stores any error messages
+     * @var array
+     */
+    protected $errorMessages;
 
     /**
      * Class constructor
      * Enforce Singleton pattern
      * @access protected
      */
-    protected function __construct(){}
+    protected function __construct()
+    {
+        $this->getGuzzleObject();
+    }
 
     /**
      * Clone
      * Enforce Singleton pattern
      * @access protected
      */
-    protected function __clone(){}
+    protected function __clone()
+    {
+    }
 
     /**
      * Get the instance
-     * @return Connection
+     * @return DruidConnection
      */
-    public function &getInstance(){
-        if(!is_object(self::$instance) || !(self::$instance instanceof Connection)) {
+    public static function &getInstance()
+    {
+        if(!is_object(self::$instance) || !(self::$instance instanceof DruidConnection))
+        {
             self::$instance = new self();
         }
         return self::$instance;
@@ -185,6 +198,10 @@ class DruidConnection {
      */
     public function setProtocol($protocol)
     {
+        if(empty($protocol))
+        {
+            $protocol = self::HTTP;
+        }
         $this->protocol = $protocol;
         return $this;
     }
@@ -214,12 +231,14 @@ class DruidConnection {
 
     /**
      * Executes the query
+     *
      * @param $method
      */
-    public function executeQuery($method){
+    public function executeQuery($method)
+    {
         $this->buildURL();
-        $request = $this->getGuzzleObject()->createRequest($method,$this->getUrl());
-        $this->setResponse($this->getGuzzleObject()->send($request));
+        $request = $this->getGuzzleObject()->createRequest($method, $this->getUrl());
+        $this->setResponse($request->send());
     }
 
     /**
@@ -241,16 +260,29 @@ class DruidConnection {
      */
     public function setUrl($url)
     {
-        $this->url = $url;
+        if(filter_var($url, FILTER_VALIDATE_URL))
+        {
+            $host = $this->getHost();
+            if(empty($host))
+            {
+                $info = parse_url($url);
+                $this->setProtocol($info['scheme']);
+                $this->setHost($info['host']);
+                $this->setPath($info['path']);
+            }
+            $this->url = $url;
+        }
         return $this;
     }
 
     /**
      * Builds the endpoint's URL
+     * @access protected
      * @return string
      */
-    public function buildUrl(){
-        $port = (is_numeric($this->getPort()))?":{$this->getPort()}":'';
+    protected function buildUrl()
+    {
+        $port = (is_numeric($this->getPort())) ? ":{$this->getPort()}" : '';
         $this->setUrl("{$this->getProtocol()}://{$this->getHost()}{$port}/{$this->getPath()}");
         return $this->getUrl();
     }
@@ -260,14 +292,25 @@ class DruidConnection {
      * It actually does a HEAD request and checks for a 200 response
      * @return bool
      */
-    public function isConnectionAvailable(){
-        $this->setResponse($this->guzzleObject->head($this->getUrl())->send());
-        $response = $this->getResponse();
-        $code = $response->getStatusCode();
-        if(200 != $code) {
+    public function isConnectionAvailable()
+    {
+        $this->buildUrl();
+        try
+        {
+            $this->setResponse($this->guzzleObject->head($this->getUrl())->send());
+            $response = $this->getResponse();
+            $code     = $response->getStatusCode();
+        }
+        catch(\Exception $e) {
+            $this->errorMessages[] = "Exception {$e->getCode()} caught with message: {$e->getMessage()}";
             return false;
         }
-        else{
+        if(200 != $code)
+        {
+            return false;
+        }
+        else
+        {
             return true;
         }
     }
@@ -279,7 +322,8 @@ class DruidConnection {
      */
     public function getGuzzleObject()
     {
-        if(!($this->guzzleObject instanceof Client)){
+        if(!($this->guzzleObject instanceof Client))
+        {
             $this->guzzleObject = new Client();
         }
         return $this->guzzleObject;
@@ -309,35 +353,50 @@ class DruidConnection {
     }
 
     /**
+     * Returns all error messages captured
+     * @return array
+     */
+    public function getErrorMessages(){
+        return $this->errorMessages;
+    }
+
+    /**
      * Returns the current config values for the object
+     *
      * @param bool $asString
      *
-     * @return array|bool
+     * @return array|string
      */
-    public function getConfig($asString=false){
-        $config = array();
-        $config['protocol'] = $this->getProtocol();
-        $config['host'] = $this->getHost();
-        $config['port'] = $this->getPort();
-        $config['path'] = $this->getPath();
-        $config['url'] = $this->getUrl();
-        $config['instance'] = get_class(self::$instance);
-        $config['guzzleObject'] = get_class($this->getGuzzleObject());
-        if($asString) {
+    public function getConfig($asString = false)
+    {
+        $config                     = array();
+        $config['protocol']         = $this->getProtocol();
+        $config['host']             = $this->getHost();
+        $config['port']             = $this->getPort();
+        $config['path']             = $this->getPath();
+        $config['url']              = $this->getUrl();
+        $config['instance']         = get_class(self::$instance);
+        $config['guzzleObject']     = get_class($this->getGuzzleObject());
+        var_dump($this->getErrorMessages());
+        $config['errorMessages']    = implode(', ',$this->getErrorMessages());
+        if($asString)
+        {
             $returnString = 'Object config:' . PHP_EOL;
-            foreach($config as $key=>$value) {
+            foreach($config as $key => $value)
+            {
                 $returnString .= "\t{$key} = {$value}" . PHP_EOL;
             }
             return $returnString;
         }
-        else{
+        else
+        {
             return $config;
         }
     }
 }
+
 $con = DruidConnection::getInstance();
 $con->setProtocol(DruidConnection::HTTP);
-$con->setHost('google.com');
-$con->buildUrl();
+$con->setHost('spiroandreakis.com');
+var_dump($con->isConnectionAvailable());
 echo $con->getConfig(true);
-$con->isConnectionAvailable();
