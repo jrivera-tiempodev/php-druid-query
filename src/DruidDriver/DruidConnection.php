@@ -1,7 +1,5 @@
 <?php
-
 namespace DruidDriver;
-require_once __DIR__ . '/../../vendor/autoload.php';
 
 use Guzzle\Http\Client as Client;
 use Guzzle\Http\Message\Response as Response;
@@ -227,8 +225,7 @@ class DruidConnection
         $config['url']              = $this->getUrl();
         $config['instance']         = get_class(self::$instance);
         $config['guzzleObject']     = get_class($this->getGuzzleObject());
-        var_dump($this->getErrorMessages());
-        $config['errorMessages']    = implode(",\n\t\t\t",$this->getErrorMessages());
+        $config['errorMessages']    = (count($this->getErrorMessages()) >0 )?implode(",\n\t\t\t",$this->getErrorMessages()):'';
         if($asString)
         {
             $returnString = 'Object config:' . PHP_EOL;
@@ -244,8 +241,3 @@ class DruidConnection
         }
     }
 }
-
-$con = DruidConnection::getInstance();
-$con->setUrl('http://google.com');
-var_dump($con->isConnectionAvailable());
-echo $con->getConfig(true);
