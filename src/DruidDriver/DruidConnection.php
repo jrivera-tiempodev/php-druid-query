@@ -1,5 +1,7 @@
 <?php
+
 namespace DruidDriver;
+require_once __DIR__ . '/../../vendor/autoload.php';
 
 use Guzzle\Http\Client as Client;
 use Guzzle\Http\Message\Response as Response;
@@ -15,38 +17,6 @@ use Guzzle\Http\Message\Response as Response;
 class DruidConnection
 {
     /**
-     * http protocol
-     */
-    const HTTP = 'http';
-    /**
-     * https protocol
-     */
-    const SECURE_HTTP = 'https';
-    /**
-     * Endpoint host
-     * @var string
-     * @access protected
-     */
-    protected $host;
-    /**
-     * Endpoint protocol
-     * @var string
-     * @access protected
-     */
-    protected $protocol;
-    /**
-     * Enpoint port
-     * @var integer
-     * @access protected
-     */
-    protected $port;
-    /**
-     * Endpoint path
-     * @var string
-     * @access protected
-     */
-    protected $path;
-    /**
      * The query to be executed
      * @var DruidQueryInterface
      */
@@ -58,7 +28,7 @@ class DruidConnection
      */
     protected static $instance;
     /**
-     * The endpoint's URL built from protocol, host, port and path
+     * The endpoint's URL
      * @var string
      */
     protected $url;
@@ -106,102 +76,6 @@ class DruidConnection
             self::$instance = new self();
         }
         return self::$instance;
-    }
-
-    /**
-     * Returns the host
-     *
-     * @return string
-     */
-    public function getHost()
-    {
-        return $this->host;
-    }
-
-    /**
-     * Sets the host
-     *
-     * @param string $host
-     *
-     * @return $this
-     */
-    public function setHost($host)
-    {
-        $this->host = $host;
-        return $this;
-    }
-
-    /**
-     * Returns the path
-     *
-     * @return string
-     */
-    public function getPath()
-    {
-        return $this->path;
-    }
-
-    /**
-     * Sets the path
-     *
-     * @param string $path
-     *
-     * @return $this
-     */
-    public function setPath($path)
-    {
-        $this->path = $path;
-        return $this;
-    }
-
-    /**
-     * Returns the port
-     *
-     * @return int
-     */
-    public function getPort()
-    {
-        return $this->port;
-    }
-
-    /**
-     * Sets the port
-     *
-     * @param int $port
-     *
-     * @return $this
-     */
-    public function setPort($port)
-    {
-        $this->port = $port;
-        return $this;
-    }
-
-    /**
-     * Returns the protocol
-     *
-     * @return string
-     */
-    public function getProtocol()
-    {
-        return $this->protocol;
-    }
-
-    /**
-     * Sets the protocol
-     *
-     * @param string $protocol
-     *
-     * @return $this
-     */
-    public function setProtocol($protocol)
-    {
-        if(empty($protocol))
-        {
-            $protocol = self::HTTP;
-        }
-        $this->protocol = $protocol;
-        return $this;
     }
 
     /**
@@ -260,29 +134,12 @@ class DruidConnection
     {
         if(filter_var($url, FILTER_VALIDATE_URL))
         {
-            $host = $this->getHost();
-            if(empty($host))
-            {
-                $info = parse_url($url);
-                $this->setProtocol($info['scheme']);
-                $this->setHost($info['host']);
-                $this->setPath($info['path']);
-            }
             $this->url = $url;
         }
+        else {
+            $this->errorMessages[] = "Error, URL {$url} is not a valid URL on line " . __LINE__;
+        }
         return $this;
-    }
-
-    /**
-     * Builds the endpoint's URL
-     * @access protected
-     * @return string
-     */
-    protected function buildUrl()
-    {
-        $port = (is_numeric($this->getPort())) ? ":{$this->getPort()}" : '';
-        $this->setUrl("{$this->getProtocol()}://{$this->getHost()}{$port}/{$this->getPath()}");
-        return $this->getUrl();
     }
 
     /**
@@ -292,15 +149,13 @@ class DruidConnection
      */
     public function isConnectionAvailable()
     {
-        $this->buildUrl();
         try
         {
             $this->setResponse($this->guzzleObject->head($this->getUrl())->send());
             $response = $this->getResponse();
             $code     = $response->getStatusCode();
         }
-        catch(\Exception $e)
-        {
+        catch(\Exception $e) {
             $this->errorMessages[] = "Exception {$e->getCode()} caught with message: {$e->getMessage()}";
             return false;
         }
@@ -355,8 +210,7 @@ class DruidConnection
      * Returns all error messages captured
      * @return array
      */
-    public function getErrorMessages()
-    {
+    public function getErrorMessages(){
         return $this->errorMessages;
     }
 
@@ -369,15 +223,12 @@ class DruidConnection
      */
     public function getConfig($asString = false)
     {
-        $config                  = array();
-        $config['protocol']      = $this->getProtocol();
-        $config['host']          = $this->getHost();
-        $config['port']          = $this->getPort();
-        $config['path']          = $this->getPath();
-        $config['url']           = $this->getUrl();
-        $config['instance']      = get_class(self::$instance);
-        $config['guzzleObject']  = get_class($this->getGuzzleObject());
-        $config['errorMessages'] = implode(', ', $this->getErrorMessages());
+        $config                     = array();
+        $config['url']              = $this->getUrl();
+        $config['instance']         = get_class(self::$instance);
+        $config['guzzleObject']     = get_class($this->getGuzzleObject());
+        var_dump($this->getErrorMessages());
+        $config['errorMessages']    = implode(",\n\t\t\t",$this->getErrorMessages());
         if($asString)
         {
             $returnString = 'Object config:' . PHP_EOL;
@@ -393,3 +244,8 @@ class DruidConnection
         }
     }
 }
+
+$con = DruidConnection::getInstance();
+$con->setUrl('http://google.com');
+var_dump($con->isConnectionAvailable());
+echo $con->getConfig(true);
